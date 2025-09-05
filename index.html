@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>WAR — Card Game (Web)</title>
+
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
+
+<style>
+  body{background:#f4f6f9;color:#212529;-webkit-tap-highlight-color:transparent}
+  .brand{display:inline-flex;align-items:center;gap:.6rem;padding:.55rem 1rem;border-radius:999px;background:linear-gradient(135deg,#e9f2ff,#f3f9ff);border:1px solid #e3eaf5;box-shadow:0 6px 18px rgba(13,110,253,.12)}
+  .muted{color:#6c757d}
+  .player-name{font-weight:700;color:#0d6efd}
+  .badge-soft{background:#eef4ff;border:1px solid #dee7ff}
+
+  /* Piles counter */
+  .pile-count{font-weight:700}
+  .pile-wrap{display:flex;align-items:center;gap:.5rem;justify-content:center}
+
+  /* Card visuals */
+  .table-area{min-height:220px}
+  .card-wrap{width:140px;height:190px;perspective:1000px;margin:0 auto}
+  .card-3d{position:relative;width:100%;height:100%;transform-style:preserve-3d;transition:transform .5s ease}
+  .card-3d.flip{transform:rotateY(180deg)}
+  .card-face{position:absolute;inset:0;background:#fff;border-radius:14px;border:2px solid #e1e5eb;box-shadow:0 10px 22px rgba(0,0,0,.10), inset 0 0 0 3px rgba(255,255,255,.45);backface-visibility:hidden;display:flex;align-items:center;justify-content:center}
+  .card-back{background:linear-gradient(135deg,#0d6efd,#00b4d8);color:#fff;font-weight:800;font-size:1.1rem;letter-spacing:.04em}
+  .card-front{transform:rotateY(180deg)}
+  .rank-corner{position:absolute;top:8px;left:10px;font-weight:800;font-size:20px}
+  .rank-corner.br{top:auto;left:auto;right:10px;bottom:8px;transform:rotate(180deg)}
+  .pip{font-size:60px;line-height:1}
+  .red{color:#d90429}.black{color:#1f2328}
+
+  /* facedown stack chips */
+  .stack{display:inline-flex;align-items:center;gap:.35rem;padding:.28rem .55rem;border-radius:999px;border:1px solid #e1e5eb;background:#fff;box-shadow:0 6px 16px rgba(0,0,0,.08)}
+  .stack .mini-card{width:18px;height:22px;border-radius:4px;background:linear-gradient(135deg,#0d6efd,#00b4d8)}
+  .stack .cnt{font-weight:700;color:#495057}
+
+  /* result chips */
+  .result{display:inline-block;padding:.45rem 1rem;border-radius:999px;border:1px solid transparent;font-weight:800;font-size:1.15rem}
+  .result.win{background:#d1e7dd;color:#0f5132;border-color:#badbcc}
+  .result.tie{background:#fff3cd;color:#664d03;border-color:#ffecb5}
+  .result.info{background:#e2e3e5;color:#343a40;border-color:#d3d6d8}
+
+  /* Controls */
+  .deal-btn,.auto-btn{font-weight:700;padding:.8rem 1.2rem}
+  .speed-wrap{display:flex;align-items:center;gap:.5rem;justify-content:center}
+  input[type=range]{width:220px}
+
+  @media (max-width: 767px){
+    .card-wrap{width:120px;height:170px}
+    .pip{font-size:52px}
+  }
+</style>
+</head>
+<body class="py-4">
+
+  <h1 class="text-center mb-2">
+    <span class="brand">🂠 WAR — Card Game</span>
+  </h1>
+  <p class="text-center muted mb-3">
+    Desktop: press <kbd>Space</kbd> to deal • Mobile: tap <b>Deal / Next</b> • <span class="badge rounded-pill text-dark badge-soft">Auto-play available</span>
+  </p>
+
+  <div class="container">
+    <!-- Controls -->
+    <div class="text-center mb-3">
+      <button id="newBtn" class="btn btn-outline-secondary me-2">↺ New Game</button>
+      <button id="stepBtn" class="btn btn-primary deal-btn me-2">👉 Deal / Next</button>
+      <button id="autoBtn" class="btn btn-success auto-btn">▶ Auto</button>
+      <div class="speed-wrap mt-2">
+        <span class="muted">Speed</span>
+        <input id="speed" type="range" min="120" max="900" step="10" value="420">
+      </div>
+    </div>
+
+    <!-- Names + pile counts -->
+    <div class="row text-center g-3 align-items-start justify-content-center">
+      <div class="col-12 col-md-5">
+        <input id="p1" class="form-control text-center mb-1" value="Player 1"/>
+        <div class="pile-wrap">
+          <span class="muted">Pile:</span>
+          <span id="c1" class="pile-count">26</span>
+        </div>
+      </div>
+      <div class="col-12 col-md-5">
+        <input id="p2" class="form-control text-center mb-1" value="Player 2"/>
+        <div class="pile-wrap">
+          <span class="muted">Pile:</span>
+          <span id="c2" class="pile-count">26</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Table / battlefield -->
+    <div class="row table-area text-center mt-3 g-4 justify-content-center align-items-start">
+      <div class="col-12 col-md-5">
+        <div class="card-wrap">
+          <div id="card1" class="card-3d">
+            <div class="card-face card-back">WAR</div>
+            <div class="card-face card-front"></div>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-md-5">
+        <div class="card-wrap">
+          <div id="card2" class="card-3d">
+            <div class="card-face card-back">WAR</div>
+            <div class="card-face card-front"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Face-down stacks during WAR -->
+    <div class="row text-center g-3 mt-2 justify-content-center">
+      <div class="col-12 col-md-5">
+        <div id="stack1" class="stack d-none"><span class="mini-card"></span><span class="cnt">0</span></div>
+      </div>
+      <div class="col-12 col-md-5">
+        <div id="stack2" class="stack d-none"><span class="mini-card"></span><span class="cnt">0</span></div>
+      </div>
+    </div>
+
+    <!-- Result + rounds -->
+    <div class="text-center mt-4">
+      <div id="result" class="result info">Press <b>Deal</b> to start.</div>
+      <p class="muted mt-2">Battles played — <span id="r">0</span> • Max 5000 (anti-loop)</p>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="text-center mt-5 py-4 border-top">
+    <p class="mb-1">Made with ❤️ by <strong>RolbitDev</strong></p>
+    <a href="https://www.linkedin.com/in/roland82" class="btn btn-outline-primary btn-sm mx-1" target="_blank" rel="noopener">💼 LinkedIn</a>
+    <a href="https://rolbitdev.odoo.com/" class="btn btn-outline-dark btn-sm mx-1" target="_blank" rel="noopener">🌐 rolbitdev.odoo.com</a>
+    <a href="https://www.instagram.com/rolbitdev?igsh=cXBnYm1mcXZwcThy" class="btn btn-outline-danger btn-sm mx-1" target="_blank" rel="noopener">📸 Instagram</a>
+  </footer>
+
+<script>
+/* =====================  WAR ENGINE  ===================== */
+
+const SUITS = [
+  { key:'♠', color:'black', name:'spades'  },
+  { key:'♥', color:'red',   name:'hearts'  },
+  { key:'♦', color:'red',   name:'diamonds'},
+  { key:'♣', color:'black', name:'clubs'   },
+];
+const RANKS = [
+  { label:'2',value:2 },{ label:'3',value:3 },{ label:'4',value:4 },{ label:'5',value:5 },
+  { label:'6',value:6 },{ label:'7',value:7 },{ label:'8',value:8 },{ label:'9',value:9 },
+  { label:'10',value:10 },{ label:'J',value:11 },{ label:'Q',value:12 },{ label:'K',value:13 },{ label:'A',value:14 }
+];
+
+const p1In = document.getElementById('p1');
+const p2In = document.getElementById('p2');
+const card1 = document.getElementById('card1');
+const card2 = document.getElementById('card2');
+const face1 = card1.querySelector('.card-front');
+const face2 = card2.querySelector('.card-front');
+const resEl = document.getElementById('result');
+const c1El = document.getElementById('c1');
+const c2El = document.getElementById('c2');
+const rEl  = document.getElementById('r');
+const stack1El = document.getElementById('stack1');
+const stack2El = document.getElementById('stack2');
+const stepBtn = document.getElementById('stepBtn');
+const autoBtn = document.getElementById('autoBtn');
+const newBtn  = document.getElementById('newBtn');
+const speedEl = document.getElementById('speed');
+
+let p1Pile=[], p2Pile=[], tableStack=[], rounds=0, auto=false, playing=false, maxRounds=5000;
+
+/* ------------ helpers ------------ */
+function buildDeck(){
+  const deck=[];
+  for(const s of SUITS){
+    for(const r of RANKS){
+      deck.push({suit:s, rank:r});
+    }
+  }
+  return deck;
+}
+function shuffle(a){
+  for(let i=a.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [a[i],a[j]]=[a[j],a[i]];
+  }
+  return a;
+}
+function sleep(ms){ return new Promise(res=>setTimeout(res,ms)); }
+function name1(){ return p1In.value.trim()||'Player 1'; }
+function name2(){ return p2In.value.trim()||'Player 2'; }
+
+function updateCounts(){
+  c1El.textContent=p1Pile.length;
+  c2El.textContent=p2Pile.length;
+  rEl.textContent=rounds;
+}
+function setResult(text, cls='info'){
+  resEl.className='result '+cls;
+  resEl.textContent=text;
+}
+function renderCard(frontEl, c){
+  const colorClass = c.suit.color==='red' ? 'red' : 'black';
+  frontEl.innerHTML = `
+    <div class="rank-corner ${colorClass}">${c.rank.label}<span style="margin-left:4px">${c.suit.key}</span></div>
+    <div class="rank-corner br ${colorClass}">${c.rank.label}<span style="margin-left:4px">${c.suit.key}</span></div>
+    <div class="pip ${colorClass}">${c.suit.key}</div>
+  `;
+}
+function resetFlips(){
+  card1.classList.remove('flip');
+  card2.classList.remove('flip');
+}
+function showStacks(s1,s2){
+  if(s1>0){ stack1El.classList.remove('d-none'); stack1El.querySelector('.cnt').textContent=s1; }
+  else stack1El.classList.add('d-none');
+  if(s2>0){ stack2El.classList.remove('d-none'); stack2El.querySelector('.cnt').textContent=s2; }
+  else stack2El.classList.add('d-none');
+}
+
+/* ------------ game setup ------------ */
+function newGame(){
+  const deck = shuffle(buildDeck());
+  p1Pile = deck.slice(0,26);
+  p2Pile = deck.slice(26);
+  tableStack = [];
+  rounds = 0; auto = false; playing = false;
+  autoBtn.classList.remove('btn-danger'); autoBtn.classList.add('btn-success'); autoBtn.textContent='▶ Auto';
+  setResult('New game. Press Deal to start.');
+  resetFlips(); face1.innerHTML=''; face2.innerHTML='';
+  showStacks(0,0);
+  updateCounts();
+}
+
+/* ------------ core WAR round ------------ */
+async function playBattle(){
+  if(playing) return;
+  if(p1Pile.length===0 || p2Pile.length===0){
+    setResult(`${p1Pile.length===0?name2():name1()} wins the game!`, 'win');
+    return;
+  }
+  playing = true;
+  const speed = Number(speedEl.value);
+
+  // clear table
+  tableStack=[];
+  showStacks(0,0);
+  setResult('Battle…');
+  resetFlips(); await sleep(120);
+
+  // draw top face-up cards
+  const c1 = p1Pile.shift();
+  const c2 = p2Pile.shift();
+  tableStack.push(c1,c2);
+  renderCard(face1,c1); renderCard(face2,c2);
+  card1.classList.add('flip'); card2.classList.add('flip');
+  await sleep(speed);
+
+  // compare
+  let tieDepth = 0;
+  while(true){
+    const v1 = tableStack[tableStack.length-2].rank.value;
+    const v2 = tableStack[tableStack.length-1].rank.value;
+
+    if(v1>v2){
+      setResult(`${name1()} wins the battle and takes ${tableStack.length} cards.`, 'win');
+      // winner collects to bottom (in order drawn)
+      p1Pile.push(...tableStack);
+      break;
+    }else if(v2>v1){
+      setResult(`${name2()} wins the battle and takes ${tableStack.length} cards.`, 'win');
+      p2Pile.push(...tableStack);
+      break;
+    }else{
+      // WAR!
+      tieDepth++;
+      setResult(`WAR! (tie ${tieDepth})`, 'tie');
+
+      // Each tries to place 3 face-down (or as many as possible), then 1 face-up.
+      const needDown = 3;
+
+      let down1 = Math.min(needDown, Math.max(0, p1Pile.length-1)); // leave at least 1 for face-up if possible
+      let down2 = Math.min(needDown, Math.max(0, p2Pile.length-1));
+
+      // If a player cannot place a face-up card, the other wins immediately with all table cards.
+      if(p1Pile.length===0 || p2Pile.length===0){
+        if(p1Pile.length===0){ setResult(`${name2()} wins the game!`, 'win'); }
+        else { setResult(`${name1()} wins the game!`, 'win'); }
+        playing=false; updateCounts(); return;
+      }
+
+      // Place facedowns
+      for(let i=0;i<down1;i++){ tableStack.push(p1Pile.shift()); }
+      for(let i=0;i<down2;i++){ tableStack.push(p2Pile.shift()); }
+      showStacks(down1,down2);
+      await sleep(Math.max(140, speed*0.6));
+
+      // Place face-up
+      if(p1Pile.length===0 || p2Pile.length===0){
+        if(p1Pile.length===0){ setResult(`${name2()} wins the game!`, 'win'); }
+        else { setResult(`${name1()} wins the game!`, 'win'); }
+        playing=false; updateCounts(); return;
+      }
+      const up1 = p1Pile.shift();
+      const up2 = p2Pile.shift();
+      tableStack.push(up1,up2);
+      // show new face-up cards
+      renderCard(face1,up1); renderCard(face2,up2);
+      resetFlips(); await sleep(80); card1.classList.add('flip'); card2.classList.add('flip');
+      await sleep(speed);
+      // loop continues to compare again
+    }
+  }
+
+  rounds++;
+  updateCounts();
+
+  // anti-infinite guard
+  if(rounds>=maxRounds){
+    setResult('Max rounds reached. Calling it a draw. Start a New Game.', 'info');
+    auto=false; autoBtn.classList.remove('btn-danger'); autoBtn.classList.add('btn-success'); autoBtn.textContent='▶ Auto';
+  }
+
+  playing=false;
+}
+
+/* ------------ controls ------------ */
+newBtn.addEventListener('click', newGame);
+stepBtn.addEventListener('click', playBattle);
+autoBtn.addEventListener('click', ()=>{
+  auto = !auto;
+  if(auto){
+    autoBtn.classList.remove('btn-success'); autoBtn.classList.add('btn-danger'); autoBtn.textContent='⏸ Pause';
+    loopAuto();
+  }else{
+    autoBtn.classList.remove('btn-danger'); autoBtn.classList.add('btn-success'); autoBtn.textContent='▶ Auto';
+  }
+});
+async function loopAuto(){
+  while(auto){
+    await playBattle();
+    const speed = Number(speedEl.value);
+    await sleep(Math.max(90, speed*0.25));
+    if(p1Pile.length===0 || p2Pile.length===0) { auto=false; }
+  }
+}
+window.addEventListener('keydown', (e)=>{
+  if(e.repeat) return;
+  if(e.code==='Space' && document.activeElement.tagName!=='INPUT'){
+    e.preventDefault();
+    playBattle();
+  }
+});
+
+/* init */
+newGame();
+</script>
+</body>
+</html>
